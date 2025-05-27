@@ -1,6 +1,8 @@
 package julian
 
 import (
+	"fmt"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -134,7 +136,7 @@ func TestConvertTimeToJulianCalendarEdgeCases(t *testing.T) {
 			name:     "Year 2000 start",
 			time:     time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
 			offset:   int64(0),
-			expected: int64(100100000),
+			expected: int64(100000), // Year 2000 % 100 = 0, Day 1, 0 seconds: "0000100000" -> 100000
 		},
 		{
 			name:     "Leap year day",
@@ -146,7 +148,7 @@ func TestConvertTimeToJulianCalendarEdgeCases(t *testing.T) {
 			name:     "End of year",
 			time:     time.Date(2021, 12, 31, 23, 59, 59, 0, time.UTC),
 			offset:   int64(0),
-			expected: int64(2136586799),
+			expected: int64(2136586399), // Year 21, Day 365, 86399 seconds (23:59:59): "2136586399"
 		},
 	}
 
@@ -165,15 +167,17 @@ func TestJulianTimeFormatConsistency(t *testing.T) {
 	testTime := time.Date(2023, 6, 15, 14, 30, 25, 0, time.UTC)
 	offset := int64(0)
 
-	// Calculate expected Julian time manually
+	// Calculate expected Julian time using the same string format as the implementation
 	year := testTime.Year() % 100 // 23
 	dayOfYear := testTime.YearDay() // Should be 166 for June 15
 	secondsInDay := testTime.Hour()*3600 + testTime.Minute()*60 + testTime.Second() // 52225
 
-	expected := int64(year*10000000 + dayOfYear*100000 + secondsInDay) - offset
+	// Use string format to match the implementation: YY(2) + DDD(3) + SSSSS(5) = 10 digits
+	expectedStr := fmt.Sprintf("%02d%03d%05d", year, dayOfYear, secondsInDay)
+	expected, _ := strconv.Atoi(expectedStr)
 	actual := convertTimeToJulianCalendarIncludingTime(testTime, offset)
 
-	if actual != expected {
+	if actual != int64(expected) {
 		t.Errorf("Julian time format inconsistency. Expected %d, got %d", expected, actual)
 		t.Logf("Year: %d, Day of year: %d, Seconds in day: %d", year, dayOfYear, secondsInDay)
 	}

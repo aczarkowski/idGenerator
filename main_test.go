@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"uidGenerator/timeprovider/epoch"
 	"uidGenerator/timeprovider/julian"
@@ -97,10 +99,17 @@ func TestIntegration_MultipleRequests(t *testing.T) {
 		}
 		
 		var response map[string]interface{}
-		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		
+		// Use Decoder to preserve number precision
+		decoder := json.NewDecoder(strings.NewReader(rec.Body.String()))
+		decoder.UseNumber()
+		
+		fmt.Printf("Request %d: Raw response body: %s\n", i, rec.Body.String())
+		if err := decoder.Decode(&response); err != nil {
 			t.Errorf("Request %d: Failed to parse response: %v", i, err)
 			continue
 		}
+		fmt.Printf("Request %d: Parsed response: %+v\n", i, response)
 		
 		ids, ok := response["ids"].([]interface{})
 		if !ok {
@@ -109,18 +118,21 @@ func TestIntegration_MultipleRequests(t *testing.T) {
 		}
 		
 		for _, idInterface := range ids {
-			// Convert to int64 (JSON numbers come as float64)
-			idFloat, ok := idInterface.(float64)
-			if !ok {
-				t.Errorf("Request %d: ID is not a number: %v", i, idInterface)
-				continue
+			// Convert json.Number to int64
+			if jsonNum, ok := idInterface.(json.Number); ok {
+				id, err := jsonNum.Int64()
+				if err != nil {
+					t.Errorf("Request %d: Failed to convert ID to int64: %v", i, err)
+					continue
+				}
+				
+				if allIds[id] {
+					t.Errorf("Request %d: Duplicate ID found: %d", i, id)
+				}
+				allIds[id] = true
+			} else {
+				t.Errorf("Request %d: ID is not a json.Number: %v (%T)", i, idInterface, idInterface)
 			}
-			id := int64(idFloat)
-			
-			if allIds[id] {
-				t.Errorf("Request %d: Duplicate ID found: %d", i, id)
-			}
-			allIds[id] = true
 		}
 	}
 	
@@ -149,7 +161,12 @@ func TestIntegration_LargeNumberOfIds(t *testing.T) {
 	}
 	
 	var response map[string]interface{}
-	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+	
+	// Use Decoder to preserve number precision
+	decoder := json.NewDecoder(strings.NewReader(rec.Body.String()))
+	decoder.UseNumber()
+	
+	if err := decoder.Decode(&response); err != nil {
 		t.Errorf("Failed to parse response: %v", err)
 	}
 	
@@ -161,12 +178,21 @@ func TestIntegration_LargeNumberOfIds(t *testing.T) {
 	// Verify all IDs are unique
 	idMap := make(map[int64]bool)
 	for _, idInterface := range ids {
-		idFloat := idInterface.(float64)
-		id := int64(idFloat)
-		if idMap[id] {
-			t.Errorf("Duplicate ID found: %d", id)
+		// Convert json.Number to int64
+		if jsonNum, ok := idInterface.(json.Number); ok {
+			id, err := jsonNum.Int64()
+			if err != nil {
+				t.Errorf("Failed to convert ID to int64: %v", err)
+				continue
+			}
+			
+			if idMap[id] {
+				t.Errorf("Duplicate ID found: %d", id)
+			}
+			idMap[id] = true
+		} else {
+			t.Errorf("ID is not a json.Number: %v (%T)", idInterface, idInterface)
 		}
-		idMap[id] = true
 	}
 }
 

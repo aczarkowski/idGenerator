@@ -2,6 +2,7 @@ package generator
 
 import (
 	"errors"
+	"sync"
 	"time"
 	"uidGenerator/timeprovider"
 )
@@ -21,10 +22,14 @@ type WorkerVariant struct {
 	lastTimeStamp int64                     //Used to remember the last time stamp
 	lastCounter   int64                     //Used to remember the last counter value
 	TimeProvider  timeprovider.TimeProvider // Used to get the current time either as epoch or Julian
+	mutex         sync.Mutex               // Ensures thread-safe access to worker state
 }
 
 // 64 bits UID
 func (w *WorkerVariant) GenerateID(numberOfIds int) ([]int64, error) {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+	
 	var ids []int64
 	currentTime := w.TimeProvider.GetTimeStamp()
 	if currentTime < w.lastTimeStamp {

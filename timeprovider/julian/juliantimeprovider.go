@@ -34,8 +34,7 @@ func convertTimeToJulianCalendarIncludingTime(time time.Time, offset int64) int6
 	secondsSinceBeginningOfTheDay := time.Hour()*3600 + time.Minute()*60 + time.Second()
 
 	// Concatenate all the above into a string and convert to a number
-
-	julianTime, _ := strconv.Atoi(fmt.Sprintf("%d%03d%05d", last2DigitsOfTheYear, daysSinceBeginningOfTheYear, secondsSinceBeginningOfTheDay))
+	julianTime, _ := strconv.Atoi(fmt.Sprintf("%02d%03d%05d", last2DigitsOfTheYear, daysSinceBeginningOfTheYear, secondsSinceBeginningOfTheDay))
 
 	return int64(julianTime) - offset
 }
